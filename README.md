@@ -41,7 +41,7 @@ agent-config/
 ```bash
 git clone git@github.com:TaurusWood/agent-config.git ~/agent-config
 cd ~/agent-config
-./scripts/install-codex.sh
+bash scripts/install-codex.sh
 ```
 
 安装脚本会：
