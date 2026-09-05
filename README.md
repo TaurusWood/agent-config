@@ -1,14 +1,20 @@
 # agent-config
 
-个人 Agent 配置仓库，用于版本化、同步和迁移长期有效的全局协作规则。
+个人 Agent 配置仓库，用于版本化、同步和迁移长期有效的全局协作规则与可复用 Agent Skills。
 
-当前只维护 Codex 的全局指令，保持单一事实源。只有在出现真实的多 Agent 复用需求后，才拆分公共规则和各 Agent adapter。
+`AGENTS.md` 继续作为 Codex 全局工程原则的唯一事实源；可重复的工作流程放入独立 Skill，避免把全局规则膨胀成任务操作手册。
 
 ## Repository structure
 
 ```text
 agent-config/
-├── AGENTS.md          # Codex 全局指令的唯一事实源
+├── AGENTS.md                    # Codex 全局工程原则
+├── skills/
+│   └── development-flow/        # 跨 Chat / Agent 的软件开发流程 Skill
+│       ├── SKILL.md
+│       ├── references/
+│       │   └── workflow.md
+│       └── assets/              # 业务仓库 Task Packet 模板
 ├── README.md
 └── scripts/
     └── install-codex.sh
@@ -16,7 +22,9 @@ agent-config/
 
 ## Scope
 
-`AGENTS.md` 只放跨项目长期有效的工程原则，例如：
+### `AGENTS.md`
+
+只放跨项目长期有效的工程原则，例如：
 
 - 事实与证据优先；
 - 最小、渐进、可回滚的改动；
@@ -36,6 +44,25 @@ agent-config/
 
 项目特定规则应继续保留在对应项目自己的 `AGENTS.md` 中。
 
+### `skills/development-flow`
+
+用于需要跨多个 Chat、Agent 或角色持续执行的软件任务。Skill 定义流程和 Gate，但不保存某个业务任务的运行状态。
+
+具体任务状态应保存在业务仓库：
+
+```text
+.agent/tasks/<task-id>/
+├── state.yaml
+├── requirement.md
+├── implementation-plan.md
+├── test-contract.md
+└── review.md
+```
+
+这样新的 Chat / Agent 可以从 Git 中恢复当前 Phase、合同、验证证据和下一步，而不是依赖聊天记忆。
+
+当前版本刻意不提供 CLI、自动状态机或 GitHub Actions Gate。先在真实项目中验证协议，再根据重复出现的问题增加自动化。
+
 ## Install on a new machine
 
 ```bash
@@ -47,10 +74,11 @@ bash scripts/install-codex.sh
 安装脚本会：
 
 1. 使用 `${CODEX_HOME:-$HOME/.codex}` 作为 Codex home；
-2. 如果已有真实的 `AGENTS.md`，先备份而不是覆盖；
-3. 创建指向本仓库 `AGENTS.md` 的符号链接。
+2. 如果已有真实的 `AGENTS.md` 或同名 Skill，先备份而不是覆盖；
+3. 创建指向本仓库 `AGENTS.md` 的符号链接；
+4. 将 `skills/development-flow` 链接到 `${CODEX_HOME}/skills/development-flow`。
 
-之后更新规则只需要：
+之后更新规则和 Skill 只需要：
 
 ```bash
 cd ~/agent-config
@@ -68,42 +96,26 @@ git pull
 3. 能实际改变 Agent 的决策或执行质量；
 4. 不依赖某个项目的局部上下文。
 
+### Keep skills procedural
+
+Skill 应解决可重复的“怎么做”，而不是吞入某个项目或某个任务的事实。
+
+如果一条规则只对特定项目成立，放回项目；如果只对某个 Task 成立，写入 Task Packet。
+
 ### Prefer deletion over accumulation
 
 不要把每次失败都变成一条新规则。优先判断问题属于：
 
 - 模型偶发失误；
 - 项目局部约束；
-- Prompt/任务描述不足；
+- Task Contract 不完整；
+- Skill 流程缺陷；
 - 真正缺失的长期工程原则。
 
-只有最后一类通常值得进入全局规则。
+只有最后一类通常值得进入全局 `AGENTS.md`。
 
 ### Evolve with evidence
 
-修改全局规则时尽量让 commit 说明“为什么改变行为”，而不只是描述文字变化。
+修改全局规则或 Skill 时尽量让 commit 说明“为什么改变行为”，而不只是描述文字变化。
 
-推荐使用类似：
-
-```text
-refine: narrow review findings to current change set
-refine: require evidence before architecture decisions
-remove: drop redundant implementation guidance
-```
-
-这样 Git 历史本身可以用于追踪 Agent 行为变化。
-
-## Future evolution
-
-在真正需要第二种 Agent 时，再考虑演化为：
-
-```text
-agent-config/
-├── rules/             # 跨 Agent 的稳定原则
-├── adapters/
-│   ├── codex/
-│   └── <other-agent>/
-└── scripts/
-```
-
-不要为了潜在的未来迁移提前引入生成器、模板系统或同步框架。
+先通过 `daily-signals`、`pocket-railway` 等真实项目积累完整 Task，再决定是否引入 CLI、schema validator、GitHub Actions 或拆分独立仓库。

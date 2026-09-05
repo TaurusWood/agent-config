@@ -1,0 +1,24 @@
+schema_version: "0.1"
+task_id: "TASK-ID"
+title: ""
+protocol:
+  name: "development-flow"
+  version: "0.1.0"
+phase: "DRAFT"
+branch: ""
+target_branch: "main"
+contracts:
+  requirement: "draft"
+  implementation_plan: "missing"
+  test_contract: "missing"
+slices: []
+current_owner:
+  role: ""
+  agent: ""
+last_verified_commit: ""
+evidence: []
+blockers: []
+next_action:
+  role: "requirement"
+  action: "Audit and close the requirement contract."
+updated_at: ""
