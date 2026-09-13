@@ -1,21 +1,32 @@
-schema_version: "0.1"
+schema_version: "0.2"
 task_id: "TASK-ID"
 title: ""
 protocol:
   name: "development-flow"
-  version: "0.1.0"
+  version: "0.2.0"
 phase: "DRAFT"
 branch: ""
 target_branch: "main"
+freeze:
+  plan: false
+  delivery: false
+implementation_mode: ""
 contracts:
   requirement: "draft"
   implementation_plan: "missing"
   test_contract: "missing"
+reviews:
+  requirement: "pending"
+  plan: "pending"
+  test: "pending"
+  implementation: "pending"
 slices: []
 current_owner:
   role: ""
   agent: ""
 last_verified_commit: ""
+review_baseline: ""
+findings: []
 evidence: []
 blockers: []
 next_action:

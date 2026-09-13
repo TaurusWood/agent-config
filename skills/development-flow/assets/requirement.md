@@ -32,7 +32,7 @@ State nearby problems this task must not solve.
 
 ## Invariants and compatibility
 
-Record behavior, data, interfaces, or safety properties that must remain true.
+Record behavior, data, interfaces, state/lifecycle rules, or safety properties that must remain true.
 
 - INV-01:
 
@@ -47,3 +47,9 @@ Record material decisions already resolved and why they matter.
 Leave empty only when no material decision remains.
 
 - None.
+
+## Requirement audit status
+
+- Verdict: `PENDING | READY | REQUEST_CHANGES`
+- Reviewed baseline / commit:
+- Material findings:

@@ -36,4 +36,5 @@ install_link() {
 }
 
 install_link "$REPO_ROOT/AGENTS.md" "$CODEX_HOME_DIR/AGENTS.md" "AGENTS.md"
+install_link "$REPO_ROOT/standards" "$CODEX_HOME_DIR/standards" "fallback engineering standards"
 install_link "$REPO_ROOT/skills/development-flow" "$CODEX_HOME_DIR/skills/development-flow" "development-flow skill"
