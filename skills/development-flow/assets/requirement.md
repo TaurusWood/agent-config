@@ -6,17 +6,27 @@ Status: DRAFT
 
 Describe the user-observable outcome in one concise statement.
 
+## Task classification
+
+Choose one:
+
+- `engineering`
+- `experience`
+- `hybrid`
+
+Explain why. If visual/UX/route/interaction/copy/asset behavior may change materially, do not classify as engineering merely because code changes are expected.
+
 ## Context and evidence
 
-Record only facts that materially affect the requirement. Link code, issues, logs, screenshots, or prior approved documents when useful.
+Record facts that materially affect the requirement. Link code, issues, logs, screenshots, prototypes, or prior approved documents when useful.
 
 ## Current behavior
 
-Describe the relevant behavior that exists now. Distinguish verified facts from assumptions.
+Describe verified current behavior. Distinguish facts from assumptions.
 
 ## Target behavior
 
-Describe what changes from the user's or external system's perspective.
+Describe what changes from the user/external-system perspective.
 
 ## Acceptance criteria
 
@@ -24,26 +34,36 @@ Use externally verifiable statements.
 
 - AC-01:
 
-## Non-goals
+## Experience impact
 
-State nearby problems this task must not solve.
+For each applicable area state `unchanged`, `already frozen`, or `design required`:
+
+- first screen / entry:
+- routes/navigation:
+- visual composition:
+- interaction feel/discoverability:
+- motion/effect language:
+- asset strategy:
+- responsive behavior:
+- user-facing copy:
+- exit/return behavior:
+
+Any `design required` item creates an Experience Gate before implementation planning.
+
+## Non-goals
 
 - NG-01:
 
 ## Invariants and compatibility
 
-Record behavior, data, interfaces, or safety properties that must remain true.
-
 - INV-01:
 
 ## Decisions
-
-Record material decisions already resolved and why they matter.
 
 - DEC-01:
 
 ## Open decisions / blockers
 
-Leave empty only when no material decision remains.
+Do not delegate material product or experience decisions to the coding agent by writing “implementation choice.”
 
 - None.

@@ -1,27 +1,44 @@
-# Development Flow Protocol v0.1
+# Development Flow Protocol v0.2
 
-This document defines the durable workflow used by the `development-flow` skill. It is intentionally small enough to apply across projects; project-specific rules stay in the target repository.
+This protocol governs engineering and experience-driven product work. Project-specific contracts remain in the target repository.
 
 ## 1. Task packet
 
-A task that needs cross-session continuity should use:
+Recommended packet:
 
 ```text
 .agent/tasks/<task-id>/
 ├── state.yaml
 ├── requirement.md
+├── experience-contract.md   # required for experience/hybrid tasks
 ├── implementation-plan.md
 ├── test-contract.md
 └── review.md
 ```
 
-Not every file must exist in `DRAFT`, but files required by a completed gate must exist before advancing.
+`state.yaml` routes work; the contracts hold the actual decisions.
 
-`state.yaml` is the routing index, not a substitute for the contracts. It records phase, ownership, slice status, evidence pointers, blockers, and next action.
+## 2. Task kinds
 
-## 2. State machine
+Classify every non-trivial task before planning:
 
-Normal path:
+### engineering
+
+User-visible behavior is already sufficiently defined. Work may include logic, infrastructure, API/data, performance, refactor, or implementation of frozen visual/interaction behavior.
+
+### experience
+
+The task creates or materially changes visual composition, UX, routes/navigation, interaction feel/discoverability, animation/effect language, visual assets, or product copy.
+
+### hybrid
+
+Both engineering and experience decisions are material.
+
+If experience impact is uncertain, treat it as `hybrid` until the uncertainty is resolved.
+
+## 3. State machine
+
+Engineering path:
 
 ```text
 DRAFT
@@ -35,137 +52,225 @@ DRAFT
   → DONE
 ```
 
-Any active phase may move to `BLOCKED` when a hard stop is reached. After the blocker is explicitly resolved, return to the phase whose gate must be re-evaluated.
+Experience/hybrid path:
 
-Do not skip a gate merely because a capable model could infer the missing decisions.
+```text
+DRAFT
+  → REQUIREMENT_READY
+  → EXPERIENCE_DRAFT
+  → EXPERIENCE_REVIEW
+  → EXPERIENCE_READY
+  → PLAN_READY
+  → TEST_READY
+  → IMPLEMENTING
+  → IMPLEMENTATION_READY
+  → REVIEWING
+  → ACCEPTANCE
+  → DONE
+```
 
-## 3. Requirement gate
+Any active phase may move to `BLOCKED`.
+
+Do not skip the Experience Gate because a model can infer or generate something plausible.
+
+## 4. Requirement gate
 
 Advance to `REQUIREMENT_READY` only when:
 
-- the user-observable goal is explicit;
+- user-observable goal is explicit;
 - current and target behavior are distinguished;
 - acceptance criteria are externally verifiable;
-- important non-goals are explicit;
-- invariants and compatibility constraints are recorded;
-- material product decisions are resolved;
-- remaining assumptions are low-impact and reversible.
+- non-goals/invariants are explicit;
+- material product decisions already known are recorded;
+- task kind is classified;
+- unresolved experience decisions are explicitly listed rather than delegated implicitly to implementation.
 
-If code, tests, docs, and user intent disagree, record the conflict. Do not let current code or existing tests silently redefine the requested behavior.
+For experience/hybrid tasks, requirement readiness does **not** authorize implementation planning. It authorizes experience design.
 
-## 4. Planning gate
+## 5. Experience Gate
+
+### 5.1 EXPERIENCE_DRAFT
+
+Use cheap artifacts to reduce uncertainty:
+
+- visual references;
+- generated/static keyframes;
+- wireframes;
+- interaction storyboards;
+- motion mockups;
+- route/IA diagrams;
+- throwaway technical spikes clearly marked as non-production.
+
+Do not write production experience merely to see what it looks like when a cheaper artifact can answer the design question.
+
+### 5.2 EXPERIENCE_REVIEW
+
+A concrete proposal must exist. Review should answer, where relevant:
+
+- first screen / product entry;
+- route/navigation model;
+- composition/framing;
+- visual hierarchy/style;
+- key desktop/mobile framing;
+- interaction states and discoverability;
+- asset strategy;
+- responsive behavior;
+- entry/exit behavior;
+- fallback behavior;
+- code-vs-asset responsibility.
+
+### 5.3 EXPERIENCE_READY
+
+Advance only after explicit human approval.
+
+Experience FREEZE is a **blocking human gate**. The agent cannot self-approve it.
+
+The artifact must be detailed enough that an implementation agent can reproduce the target without inventing material product/art decisions.
+
+If not, remain in `EXPERIENCE_DRAFT`/`REVIEW` or `BLOCKED`.
+
+## 6. Planning gate
 
 Advance to `PLAN_READY` only when:
 
-- the relevant existing architecture and call/data/state path were inspected;
+- relevant architecture/state/data path is inspected;
+- experience prerequisites are `EXPERIENCE_READY` when applicable;
 - source of truth is explicit;
-- changes are minimal and consistent with the project;
-- new abstractions or dependencies have demonstrated need;
+- changes are minimal and project-consistent;
+- new abstractions/dependencies have demonstrated need;
 - work is split into independently verifiable slices;
-- each slice has goal, scope, invariants, acceptance criteria, required tests, verification commands, dependencies, and hard-stop conditions;
-- the plan does not defer a known business decision to the implementation agent.
+- each slice declares `kind: engineering | experience | hybrid`;
+- each slice has goal, scope, invariants, acceptance, tests, verification, dependencies, and hard-stop conditions;
+- experience slices explicitly identify their blocking human gates;
+- plan does not defer a known product decision to the coding agent.
 
-A slice is a behavioral unit, not a file-count or line-count target.
+A slice is behavioral, not a file-count target.
 
-## 5. Test gate
+## 7. Test gate
 
 Advance to `TEST_READY` only when every critical acceptance criterion maps to convincing evidence.
 
-Use the cheapest test layer that can prove the behavior without bypassing the failure-prone boundary:
+Evidence hierarchy:
 
-1. static checks — syntax, lint, type, build;
-2. unit tests — algorithms, pure functions, local invariants;
-3. integration/contract tests — module boundaries, schemas, state transitions, persistence contracts;
-4. automated journey/smoke tests — production-facing entry through the important component path;
-5. manual/computer-use acceptance — visual, OS, third-party, or exploratory behavior that is not reliable or economical to automate.
+1. static checks;
+2. unit tests;
+3. integration/contract tests;
+4. production-facing automated journey/smoke;
+5. manual/computer-use acceptance where human/environment judgment is authoritative.
 
-Critical user journeys should not be proven only through unit tests when the actual defect could occur between components.
+For every critical automated test ask:
 
-For each critical test ask a Failure Challenge: **if the acceptance criterion were deliberately broken, would this test reliably fail?** If not, it is not sufficient acceptance evidence.
+> If the behavior were deliberately broken, would this test reliably fail?
 
-Mock only where isolation is necessary. Do not mock away the boundary the test exists to verify.
+For visual/UX work also ask:
 
-## 6. Implementation gate
+> Does this test prove fidelity to an approved target, or only that something renders?
 
-During `IMPLEMENTING`, execute slices in dependency order unless the plan explicitly allows parallel work.
+Manual gates must be classified:
 
-After every slice run a checkpoint:
+- `blocking-human`;
+- `nonblocking-human`.
 
-1. inspect the resulting diff;
+If a blocking gate is required before dependent implementation, it must already be PASS before that dependency begins.
+
+## 8. Implementation gate
+
+During `IMPLEMENTING`, execute slices in dependency order.
+
+After every slice:
+
+1. inspect diff;
 2. run targeted tests;
-3. run relevant integration or journey tests;
-4. verify slice acceptance criteria;
-5. verify invariants and non-goals;
-6. confirm no duplicate source of truth or unplanned architecture was introduced;
-7. confirm tests were not weakened to obtain green status;
-8. record evidence and slice status.
+3. run relevant integration/journey tests;
+4. verify acceptance criteria/invariants/non-goals;
+5. confirm tests were not weakened;
+6. evaluate manual gates;
+7. record evidence/status.
 
-A green checkpoint may proceed automatically when the user's instruction authorizes completing the task and no hard stop is present.
+Automatic continuation is allowed only when:
 
-Advance to `IMPLEMENTATION_READY` only when all planned slices are complete and the full change-level verification appropriate to the risk is green or explicitly documented as unavailable.
+- next slice is dependency-ready;
+- no material product/architecture decision is missing;
+- all blocking human gates for dependent work are PASS.
 
-## 7. Review gate
+A pending blocking human gate is a hard stop even when all automated tests are green.
 
-Review against the trusted pre-change baseline, normally `merge-base(target, HEAD)` for a branch review.
+## 9. Goal Mode
 
-Review in this order:
+Goal Mode is a scheduler over already-authorized work, not a substitute for product design.
 
-1. correctness and requirement compliance;
-2. state/lifecycle/invariants;
-3. data integrity, idempotency, failure and recovery behavior;
-4. compatibility and security boundaries;
-5. false-green test risk;
-6. architecture consistency and unnecessary complexity;
-7. maintainability.
+It may chain engineering slices.
 
-Do not use modified requirement documents in the same untrusted change set as sole evidence that the implementation is correct.
+When the next work item requires visual/UX/route/interaction/copy/asset decisions that are not frozen, stop with:
 
-Review outcomes:
+```text
+HARD STOP — EXPERIENCE GATE REQUIRED
+Current phase/slice:
+Pending gate:
+Required human decision/evidence:
+Dependent work that must not start:
+```
 
-- `PASS` → advance to `ACCEPTANCE` when acceptance evidence remains, otherwise `DONE`.
-- `PASS_WITH_NON_BLOCKING_FINDINGS` → same transition, with findings recorded.
-- `BLOCK` → record findings and return to the required earlier phase or `BLOCKED` if a material decision is needed.
+Do not use production code as the default medium for exploring unresolved experience design.
 
-## 8. Acceptance gate
+## 10. Review gate
 
-Acceptance answers whether the shipped behavior is demonstrated in the environment that matters.
+Review against a trusted pre-change baseline.
 
-Prefer deterministic automated evidence. Add manual or computer-use checks only for residual behavior that automation cannot prove well.
+Review order:
+
+1. requirement/experience fidelity;
+2. correctness/invariants/lifecycle;
+3. data/recovery/security/compatibility;
+4. false-green test risk;
+5. architecture consistency/complexity;
+6. maintainability.
+
+For experience work, compare against approved keyframes/storyboards/IA rather than against the previous implementation.
+
+Outcomes:
+
+- `PASS`;
+- `PASS_WITH_NON_BLOCKING_FINDINGS`;
+- `BLOCK`.
+
+A visual implementation that is technically correct but fails the approved Experience Contract is `BLOCK`.
+
+## 11. Acceptance gate
 
 Advance to `DONE` only when:
 
-- all acceptance criteria are satisfied or explicitly waived by the user;
+- all acceptance criteria are satisfied/explicitly waived;
 - required automated checks are green;
-- required manual/computer-use checks are complete;
-- blocking review findings are resolved;
-- residual risks and unverified areas are documented;
-- `state.yaml` points to the final verified commit or equivalent durable evidence when available.
+- required blocking human gates are PASS;
+- review blockers are resolved;
+- residual risks/unverified areas are recorded;
+- final verified commit/evidence is durable.
 
-## 9. Cross-chat handoff
+## 12. Cross-chat handoff
 
-A new agent or chat should be able to resume by reading project rules and the task packet.
+Persist:
 
-Before ending an active phase, persist:
-
+- task kind;
 - current phase;
-- completed and pending slices;
-- decisions that changed a contract;
-- verification commands and outcomes;
-- relevant commit SHA or diff baseline when known;
-- blockers;
-- exact next role and action.
+- completed/pending slices;
+- experience approval status and artifact version;
+- contract decisions;
+- verification results;
+- commit/diff baseline;
+- blocking human gates;
+- exact next action.
 
-Do not store a long conversation transcript. Persist decisions and evidence, not discussion history.
+Persist decisions/evidence, not transcript.
 
-## 10. State reconciliation
-
-Repository state can move outside this workflow. Therefore `state.yaml` is not blindly authoritative about facts such as current commit or test status.
+## 13. State reconciliation
 
 On resume:
 
-1. compare the recorded branch/commit with the actual repository;
-2. inspect relevant diff and working tree state;
-3. re-run only the checks needed to establish a trustworthy baseline;
-4. update stale state before making further transitions.
+1. compare recorded branch/commit with repository;
+2. inspect relevant diff/worktree;
+3. validate persisted experience artifacts still match implementation target;
+4. re-run only checks needed for trustworthy baseline;
+5. update stale state before advancing.
 
-When a task packet conflicts with explicit new user instructions, follow the user and update the task packet so later agents do not inherit stale intent.
+Explicit new user instructions override stale task state and must be persisted.

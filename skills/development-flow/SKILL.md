@@ -1,77 +1,141 @@
 ---
 name: development-flow
-description: Govern non-trivial software work across multiple chats, agents, and roles using repository-persisted task contracts, workflow state, verification gates, and review evidence. Use when starting, continuing, testing, implementing, or reviewing a task that must remain consistent across sessions or agents, especially when the repository contains .agent/tasks or the user asks to follow the standard development flow.
+description: Govern non-trivial software and experience-driven product work across chats and agents using repository-persisted contracts, explicit experience gates, implementation slices, verification gates, and review evidence. Use when work must remain consistent across sessions or agents, especially when visual/UX/interaction decisions must not be invented by coding agents.
 license: MIT
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # Agent Development Flow
 
-Use this skill to make the repository, rather than chat memory, the source of truth for a software task's current phase, approved contracts, execution evidence, and next action.
+Use this skill to make the repository, rather than chat memory, the source of truth for requirement, experience, plan, test, implementation, review, and acceptance state.
 
-The user's explicit instructions take precedence over this skill. Project-specific `AGENTS.md` and architecture rules remain authoritative for project-local constraints.
+The user's explicit instructions take precedence. Project-specific `AGENTS.md` and project contracts remain authoritative for local constraints.
 
 ## Core model
 
-Separate three sources of truth:
+Keep four concerns distinct:
 
-1. **Engineering protocol** — this skill defines how work moves through phases and gates.
-2. **Project rules** — the target repository defines how that project is structured and engineered.
-3. **Task packet** — `.agent/tasks/<task-id>/` defines what the current task means and where it is in the flow.
+1. **Engineering protocol** — this skill defines phases and gates.
+2. **Project rules** — the target repository defines architecture/coding constraints.
+3. **Experience authority** — when work changes visual/UX/route/interaction behavior, approved experience artifacts define what the user should actually see and feel.
+4. **Task packet** — `.agent/tasks/<task-id>/` records task-specific contracts, state, evidence, and next action.
 
-Do not use chat history as the only durable source for an approved decision or task status.
+Do not use chat history as the only durable source for an approved decision.
+
+## Classify the task before planning
+
+Every non-trivial task must be classified:
+
+- `engineering` — user-visible behavior is already defined; work is primarily logic, infrastructure, data, API, performance, refactor, or implementation of frozen behavior;
+- `experience` — work creates or materially changes visual composition, UX, routes/navigation, interaction feel/discoverability, animation language, visual assets, or product copy;
+- `hybrid` — both are material.
+
+If classification is `experience` or `hybrid`, the task must pass the Experience Gate before dependent implementation planning is considered ready.
+
+A capable model being able to invent a plausible design is not permission to do so.
 
 ## Start or resume a task
 
 For non-trivial work:
 
-1. Read the target repository's `AGENTS.md` and directly relevant project documentation.
-2. Resolve the task ID. If an existing task packet is referenced, use it. Do not create a second task for the same work.
-3. Read `.agent/tasks/<task-id>/state.yaml` first, then the artifacts required by its current phase.
-4. Inspect the actual repository state, branch, diff, code, and tests needed to verify that the persisted state is not stale.
-5. Read `references/workflow.md` and follow the gate for the current phase.
+1. Read project rules and directly relevant documents.
+2. Resolve the task ID and existing task packet if present.
+3. Read `state.yaml` first.
+4. Reconcile recorded branch/commit with actual repository state.
+5. Read `references/workflow.md` and load artifacts required by the current phase.
 6. Perform only work authorized by the current phase and user request.
-7. Before finishing, update durable task artifacts and `state.yaml` with evidence, blockers, and the next action when repository writes are authorized.
+7. Persist decisions, evidence, blockers, and next action before finishing when writes are authorized.
 
-If no task packet exists and the user is beginning a non-trivial task that needs this flow, bootstrap it from the templates in `assets/`. Keep the first version minimal; do not fill unknown decisions by guessing.
+If no packet exists, bootstrap from `assets/` without guessing unknown decisions.
 
 ## Phase routing
 
-Use `state.yaml.phase` to decide what to load and do:
+Use `state.yaml.phase`:
 
-- `DRAFT` → clarify and audit the requirement using `assets/requirement.md`.
-- `REQUIREMENT_READY` → create or audit the implementation plan using `assets/implementation-plan.md`.
-- `PLAN_READY` → create the test contract using `assets/test-contract.md`.
+- `DRAFT` → close requirement using `assets/requirement.md`.
+- `REQUIREMENT_READY` → if experience/hybrid, create/audit `experience-contract.md`; otherwise create/audit implementation plan.
+- `EXPERIENCE_DRAFT` → explore options cheaply; do not implement production experience.
+- `EXPERIENCE_REVIEW` → present concrete keyframes/storyboards/IA/asset strategy for human approval.
+- `EXPERIENCE_READY` → architecture/implementation planning may proceed.
+- `PLAN_READY` → create/audit test contract.
 - `TEST_READY` or `IMPLEMENTING` → implement slices and run slice gates.
-- `IMPLEMENTATION_READY` or `REVIEWING` → perform independent code review using `assets/review.md`.
-- `ACCEPTANCE` → run remaining acceptance evidence, including manual or computer-use checks only where automation is unsuitable.
-- `DONE` → do not reopen implementation unless new scope or a defect creates a new task or explicitly reopens this one.
-- `BLOCKED` → resolve the recorded blocker before advancing the flow.
+- `IMPLEMENTATION_READY` or `REVIEWING` → independent code review.
+- `ACCEPTANCE` → remaining automated and manual acceptance.
+- `DONE` → do not reopen without new scope/defect.
+- `BLOCKED` → resolve the recorded blocker before advancing.
 
-A checkpoint is not automatically a human approval point. If a gate is green and no material decision is required, continue when the user's instruction authorizes continued execution.
+## Experience Gate
+
+Experience work is ready only when the repository contains an approved target sufficient for an implementation agent to execute without inventing product decisions.
+
+Depending on the task, this includes:
+
+- route/entry/exit IA;
+- approved visual reference/keyframe;
+- composition/framing;
+- interaction storyboard;
+- discoverability behavior;
+- asset strategy;
+- responsive behavior;
+- user-facing copy where material;
+- explicit human approval.
+
+Use `assets/experience-contract.md`.
+
+Human approval of Experience FREEZE is a **blocking human gate**. An agent cannot self-approve it.
 
 ## Verification rule
 
-For each critical user-observable acceptance criterion, prefer at least one automated test that enters through the production-facing entry point for that behavior and crosses the important component boundaries. Examples include viewport/input for a game, Playwright for a web journey, an HTTP request through the real router for an API, a subprocess invocation for a CLI, or the public pipeline with realistic fixtures for file processing.
+For critical user-observable acceptance criteria, prefer automated evidence through the production-facing entry point when deterministic automation can prove the behavior.
 
-Do not equate “real entry” with computer use. Computer use or manual acceptance belongs at the final layer for behavior that cannot be verified reliably and economically in code, such as visual layout, OS dialogs, third-party OAuth, or exploratory UX checks.
+But automation cannot establish aesthetic or perceptual approval. Screenshot tests can protect an approved visual state from regression; they cannot decide whether the original state is acceptable.
+
+Classify manual gates as:
+
+- `blocking-human` — dependent work must stop until PASS;
+- `nonblocking-human` — explicitly safe to defer because the decision cannot change downstream semantics/architecture.
+
+Visual composition, product IA, interaction feel/discoverability, major animation language, and keyframe fidelity are blocking by default.
 
 ## Hard stops
 
-Do not silently make a new material product or architecture decision merely to keep execution moving. Stop the current direction and record a blocker when continuing requires one of the following:
+Stop and record a blocker when continuing requires:
 
-- contradictory approved requirements or contracts;
-- breaking an explicit non-goal or invariant;
-- changing an unapproved user-observable behavior;
-- adding a major architecture layer, database, public API, permission model, or dependency not covered by the plan;
-- an unplanned incompatible schema or persistence migration;
-- an irreversible or security-sensitive decision without authority;
-- a slice expanding enough that the implementation plan is probably wrong;
-- a critical external fact that cannot be verified and would otherwise have to be guessed.
+- contradictory approved requirements/contracts;
+- breaking a non-goal/invariant;
+- changing unapproved user-observable behavior;
+- inventing visual composition, route/navigation, interaction feel, product copy, or asset strategy without an approved Experience Contract;
+- proceeding past a pending/failed `blocking-human` gate;
+- adding a major architecture layer/database/public API/permission model/dependency not covered by plan;
+- incompatible schema/persistence migration not planned;
+- irreversible/security-sensitive decision without authority;
+- a slice expanding enough that the plan is probably wrong;
+- a critical external fact that cannot be verified.
 
-Ordinary implementation defects, lint failures, compile failures, local test failures caused by the change, and small in-scope corrections are not hard stops.
+Ordinary compile/lint/test failures and small in-scope corrections are not hard stops.
+
+## Goal Mode
+
+Goal Mode may autonomously chain **Engineering Slices** when their dependency gates are satisfied.
+
+Goal Mode must not cross an Experience Gate or pending blocking human gate.
+
+Required stop format:
+
+```text
+HARD STOP — EXPERIENCE GATE REQUIRED
+Current phase/slice:
+Pending decision/gate:
+Evidence prepared for human review:
+Dependent work that must not begin:
+Safe independent work remaining, if any:
+```
+
+Throughput does not override product uncertainty.
 
 ## Completion
 
-Never report a phase complete only because code was written or tests are green. A phase is complete only when its gate in `references/workflow.md` is satisfied and the task packet contains enough durable evidence for another chat or agent to resume without reconstructing decisions from conversation history.
+Never report a phase complete merely because code exists or tests are green.
+
+A phase is complete only when its gate in `references/workflow.md` is satisfied and another agent can resume from durable repository evidence without reconstructing decisions from chat history.

@@ -1,17 +1,20 @@
-schema_version: "0.1"
+schema_version: "0.2"
 task_id: "TASK-ID"
 title: ""
 protocol:
   name: "development-flow"
-  version: "0.1.0"
+  version: "0.2.0"
+task_kind: "" # engineering | experience | hybrid
 phase: "DRAFT"
 branch: ""
 target_branch: "main"
 contracts:
   requirement: "draft"
+  experience: "not_classified" # not_required | draft | review | frozen | blocked
   implementation_plan: "missing"
   test_contract: "missing"
 slices: []
+blocking_human_gates: []
 current_owner:
   role: ""
   agent: ""
@@ -20,5 +23,5 @@ evidence: []
 blockers: []
 next_action:
   role: "requirement"
-  action: "Audit and close the requirement contract."
+  action: "Audit the requirement, classify task kind, and identify experience decisions that must not be delegated to implementation."
 updated_at: ""
