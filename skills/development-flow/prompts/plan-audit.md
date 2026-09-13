@@ -3,13 +3,17 @@
 Use when the Implementation Contract is ready for independent audit. Do not implement code.
 
 ```text
-Independently audit the Implementation Contract against the approved Requirement Contract and the actual repository.
+Independently audit the Implementation Contract against the approved Requirement Contract, any required frozen Experience Contract, and the actual repository.
 
-Assume the plan may be wrong. Do not accept its architecture or slice boundaries merely because they are already written.
+Assume the plan may be wrong. Do not accept its architecture, slice boundaries, or experience assumptions merely because they are already written.
 
 Check:
 - complete requirement and acceptance coverage;
 - correct understanding of existing architecture and source of truth;
+- task classification is correct: engineering vs experience-sensitive;
+- every experience-sensitive slice names authoritative FROZEN experience artifacts;
+- no slice asks the implementation agent to invent routes/navigation, visual composition, interaction feel/discoverability, asset strategy, scene framing, or major UX behavior;
+- blocking-human gates appear before dependent downstream investment;
 - hidden state/lifecycle gaps;
 - cross-slice dependencies and composition risk;
 - failure, recovery, compatibility, persistence, and security boundaries where applicable;
@@ -19,14 +23,16 @@ Check:
 - unnecessary abstractions, dependencies, duplicate ownership, or speculative scope;
 - whether required tests and verification commands can actually prove the slice.
 
-A small diff is not automatically a simple task. Count interacting semantic constraints, not lines or files.
+A small diff is not automatically a simple task. Count interacting semantic and experience constraints, not lines or files.
 
-Do not implement code and do not silently repair material requirement defects inside the plan.
+If required Experience Design is missing or not explicitly human-approved, REQUEST_CHANGES. Do not FREEZE a plan whose apparent completeness depends on agent inference.
+
+Do not implement code and do not silently repair material requirement/experience defects inside the plan.
 
 Return exactly one verdict:
 FREEZE
 REQUEST_CHANGES
 
-FREEZE means the Requirement Contract + Implementation Contract may enter PLAN_FROZEN.
+FREEZE means Requirement + required Experience Contract + Implementation Contract may enter PLAN_FROZEN.
 For REQUEST_CHANGES, report only material findings with evidence, impact, and bounded correction direction.
 ```
