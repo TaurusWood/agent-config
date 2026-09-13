@@ -2,7 +2,7 @@
 
 This document defines the durable workflow used by the `development-flow` skill. It is intentionally small enough to apply across projects; project-specific rules stay in the target repository.
 
-The workflow separates specification closure, test design, implementation, and review so that defects can be attributed to the correct stage instead of being discovered through an unbounded sequence of code-review rounds.
+The workflow separates specification closure, conditional experience closure, test design, implementation, and review so defects can be attributed to the correct stage instead of being discovered through an unbounded sequence of code-review rounds.
 
 ## 1. Task packet
 
@@ -12,6 +12,7 @@ A task that needs cross-session continuity should use:
 .agent/tasks/<task-id>/
 ├── state.yaml
 ├── requirement.md
+├── experience-contract.md   # only when experience-sensitive
 ├── implementation-plan.md
 ├── test-contract.md
 └── review.md
@@ -19,7 +20,7 @@ A task that needs cross-session continuity should use:
 
 Not every file must exist in `DRAFT`, but files required by a completed gate must exist before advancing.
 
-`state.yaml` is the routing index, not a substitute for the contracts. It records phase, implementation mode, contract status, slice status, evidence pointers, blockers, and next action.
+`state.yaml` is the routing index, not a substitute for the contracts. It records phase, task classification, experience status, implementation mode, contract status, slice status, human-gate status, evidence pointers, blockers, and next action.
 
 ## 2. State machine
 
@@ -28,6 +29,7 @@ Normal path:
 ```text
 DRAFT
   → REQUIREMENT_READY
+  → [EXPERIENCE GATE when required]
   → PLAN_READY
   → PLAN_FROZEN
   → TEST_READY
@@ -39,14 +41,16 @@ DRAFT
   → DONE
 ```
 
-Any active phase may move to `BLOCKED` when a hard stop is reached. After the blocker is explicitly resolved, return to the earliest phase whose gate must be re-evaluated.
+The Experience Gate is conditional rather than a separate mandatory phase value. Track it in `state.yaml.classification`, `contracts.experience`, `reviews.experience`, and `manual_gates`.
+
+Any active phase may move to `BLOCKED` when a hard stop is reached. After the blocker is explicitly resolved, return to the earliest phase/gate whose assumptions changed.
 
 Do not skip a gate merely because a capable model could infer missing decisions.
 
 The two freeze points have different meanings:
 
-- **PLAN_FROZEN** — the requirement and implementation plan form an approved design baseline. Test design may challenge this baseline, but must not silently rewrite it.
-- **DELIVERY_FROZEN** — requirement, implementation plan, and test contract form the implementation authority boundary. Implementation may choose how to execute within that boundary, but must not redefine observable behavior, acceptance criteria, or material architecture constraints.
+- **PLAN_FROZEN** — requirement + required frozen experience + implementation plan form an approved design baseline.
+- **DELIVERY_FROZEN** — requirement + required frozen experience + implementation plan + test contract form the implementation authority boundary.
 
 ## 3. Requirement gate
 
@@ -57,269 +61,329 @@ Advance to `REQUIREMENT_READY` only when:
 - acceptance criteria are externally verifiable;
 - important non-goals are explicit;
 - invariants and compatibility constraints are recorded;
-- material product decisions are resolved;
+- material product decisions are resolved enough to identify whether Experience Design is required;
 - remaining assumptions are low-impact and reversible.
 
-If code, tests, docs, and user intent disagree, record the conflict. Do not let current code or existing tests silently redefine the requested behavior.
+Classify the task before planning:
+
+- `engineering` — user-visible behavior is already frozen or the work is non-experiential;
+- `experience-sensitive` — implementation would create/materially change home/entry/exit, routes/navigation, visual composition/framing, UI/UX, user-facing copy, interaction feel/discoverability, scene presentation, major animation/effect language, asset strategy, or unresolved responsive behavior.
+
+If code, tests, docs, and user intent disagree, record the conflict. Do not let current code or existing tests silently redefine requested behavior.
 
 A requirement audit should challenge the requirement itself, not merely proofread it.
 
-## 4. Planning gate
+## 4. Conditional Experience Gate
 
-Create an implementation plan only after inspecting the relevant architecture, call/data/state paths, project rules, and current repository state.
+For `experience-sensitive` work, close Experience Design **before production implementation planning is frozen**.
+
+Use a project-local experience document or `assets/experience-contract.md`.
+
+The artifact should define enough of the user-visible target that an implementation agent can reproduce approved decisions rather than inventing them. Depending on scope, include:
+
+- first screen / entry / exit;
+- route/navigation IA;
+- approved visual/UX references;
+- keyframes/mockups/storyboards;
+- composition/framing/hierarchy;
+- interaction states and discoverability;
+- asset strategy and code responsibility split;
+- responsive behavior;
+- failure/fallback experience;
+- explicit non-goals.
+
+Approval states:
+
+- `DRAFT` — unresolved;
+- `REVIEW` — concrete proposal ready for human decision;
+- `FROZEN` — explicit human approval; implementation authority granted;
+- `BLOCKED` — required decision/artifact missing.
+
+Experience FREEZE is a **blocking-human gate**. An agent may prepare options, generated keyframes, mockups, storyboards, or throwaway feasibility spikes, but may not self-set `FROZEN`.
+
+A technical spike proves feasibility only. It does not make its routes, visual composition, interaction presentation, or UI accepted product behavior.
+
+If no experience decision is required, record `experience_status: NOT_REQUIRED` and continue.
+
+## 5. Planning gate
+
+Create an implementation plan only after inspecting relevant architecture, call/data/state paths, project rules, current repository state, and any required frozen Experience Contract.
 
 Advance to `PLAN_READY` when the plan is ready for independent audit and:
 
 - the source of truth is explicit;
 - changes are minimal and architecture-consistent;
-- new abstractions or dependencies have demonstrated need;
+- new abstractions/dependencies have demonstrated need;
 - work is split into behavioral slices rather than file-count targets;
-- each slice has goal, scope, invariants, acceptance criteria, required tests, verification commands, dependencies, and hard-stop conditions;
-- the plan does not defer a known product or architecture decision to the implementation agent.
+- every slice is classified `engineering` or `experience-sensitive`;
+- each slice has goal, scope, invariants, acceptance criteria, required tests, verification commands, dependencies, human-gate dependencies, and hard-stop conditions;
+- experience-sensitive slices name the exact approved artifacts they implement;
+- the plan does not defer a known product, experience, or architecture decision to the implementation agent.
 
-A slice can be small in code volume and still be cognitively complex. Planning must account for the number of state, lifecycle, contract, or cross-module invariants that must hold simultaneously.
+A slice can be small in code volume and still be cognitively complex. Planning must account for state, lifecycle, contract, experience, and cross-module invariants.
 
-## 5. Plan audit and PLAN FREEZE
+## 6. Plan audit and PLAN FREEZE
 
 The plan audit is independent from plan authoring. Treat the plan as potentially wrong.
 
 Check at minimum:
 
 - complete requirement coverage;
-- hidden state or lifecycle gaps;
+- hidden state/lifecycle gaps;
 - cross-slice dependencies;
-- failure, recovery, compatibility, and persistence boundaries;
-- whether acceptance criteria are implementable and testable;
+- failure/recovery/compatibility/persistence boundaries;
+- whether acceptance criteria are implementable/testable;
 - whether a lower-cost implementation agent can execute each slice without inventing product behavior;
-- whether the plan introduces unnecessary architecture or duplicates an existing source of truth.
+- whether experience-sensitive slices are backed by `FROZEN` experience authority;
+- whether blocking-human gates occur before dependent downstream investment;
+- whether the plan introduces unnecessary architecture or duplicate sources of truth.
 
 If the audit passes, advance to `PLAN_FROZEN`.
 
-After `PLAN_FROZEN`, test authors may identify a `PLAN_OR_SPEC_DEFECT`, but they must not silently repair the design. A material defect returns the task to the earliest affected gate, followed by another plan audit before re-freezing.
+For experience-sensitive work, `PLAN_FROZEN` is invalid if the required Experience Contract is not `FROZEN` with explicit human PASS.
 
-## 6. Test design gate
+After `PLAN_FROZEN`, test authors may identify a `PLAN_OR_SPEC_DEFECT`, but they must not silently repair the design. A material defect returns the task to the earliest affected gate, followed by required re-review before re-freezing.
+
+## 7. Test design gate
 
 After `PLAN_FROZEN`, design the test contract and concrete test cases before implementation.
 
-Testing exists to prove the frozen behavior, not to maximize test count or coverage percentage.
+Testing exists to prove frozen behavior, not to maximize test count or coverage percentage.
 
 Map every critical acceptance criterion to convincing evidence using the cheapest layer that does not bypass the failure-prone boundary:
 
-1. static checks — syntax, lint, type, build;
-2. unit tests — algorithms, pure functions, local invariants;
-3. integration/contract tests — module boundaries, schemas, state transitions, persistence contracts;
-4. automated journey/smoke tests — production-facing entry through the important component path;
-5. manual/computer-use acceptance — visual, OS, third-party, or exploratory behavior that is not reliable or economical to automate.
+1. static checks;
+2. unit tests;
+3. integration/contract tests;
+4. automated journey/smoke tests through production-facing entry;
+5. manual/computer-use acceptance where human judgment is authoritative.
 
-Where practical, write executable pre-implementation tests for frozen externally observable behavior. They may initially fail because production behavior is not implemented yet. Do not force all tests to be executable before implementation when doing so would require production scaffolding or implementation-specific coupling.
+Where practical, write executable pre-implementation tests for frozen externally observable behavior. Do not force them when this requires production scaffolding or implementation-specific coupling.
 
-For each critical test ask the Failure Challenge:
+For each critical test ask:
 
 > If the acceptance criterion were deliberately broken, would this test reliably fail?
 
-Mock only where isolation is necessary. Do not mock away the boundary the test exists to verify.
+For visual/UX acceptance also ask:
 
-Advance to `TEST_READY` when the test contract and any pre-implementation test diff are ready for independent test review.
+> Does this prove fidelity to the approved target, or only that something renders?
 
-## 7. Test review and DELIVERY FREEZE
+Classify every manual gate:
 
-Test review is a distinct gate from test authoring.
+- `blocking-human` — dependent work stops until explicit PASS;
+- `nonblocking-human` — may remain pending only when it cannot change downstream architecture/product semantics/correctness.
+
+Visual composition, product entry/navigation, interaction feel/discoverability, scene framing, major effect language, and fidelity to approved keyframes/storyboards are blocking by default when failure would invalidate downstream work.
+
+Advance to `TEST_READY` only when the contract and pre-implementation test diff are ready for independent review.
+
+## 8. Test review and DELIVERY FREEZE
 
 Review whether:
 
 - every critical acceptance criterion has meaningful evidence;
-- test oracles are derived from the frozen requirement and plan rather than implementation convenience;
-- tests would fail for the intended defect;
-- important state transitions, boundaries, failure paths, and recovery paths are covered where applicable;
-- mocks, fixtures, shortcuts, or bypassed entry paths create false-green risk;
-- tests do not silently introduce new product behavior;
-- the suite is proportionate and does not duplicate assertions without diagnostic value.
+- test oracles derive from frozen requirements/experience/plan rather than implementation convenience;
+- tests would fail for intended defects;
+- important state transitions, boundaries, failure paths, and recovery paths are covered;
+- mocks/fixtures/shortcuts/bypassed entry paths create false-green risk;
+- tests do not silently introduce product behavior;
+- all manual gates have correct blocking classification;
+- the suite is proportionate.
 
-If test review exposes a requirement or plan defect, classify it as `PLAN_OR_SPEC_DEFECT`, return to the affected gate, and re-run the required audits.
+If review exposes a requirement, experience, or plan defect, classify it `PLAN_OR_SPEC_DEFECT`, return to the affected gate, and re-run downstream audits.
 
 If test review passes, advance to `DELIVERY_FROZEN`.
 
-At `DELIVERY_FROZEN`, the requirement, implementation plan, and test contract are authoritative for implementation. Changes to any material frozen behavior require an explicit rollback to the affected gate.
+At `DELIVERY_FROZEN`, implementation authority consists of the requirement, required frozen experience, implementation plan, and test contract. Material changes require explicit rollback to the affected gate.
 
-## 8. Implementation mode selection
+## 9. Implementation mode selection
 
-Choose the implementation mode after `DELIVERY_FROZEN`.
+Choose implementation mode after `DELIVERY_FROZEN`.
 
 ### Slice execution
 
-Use when the plan already defines low-discretion behavioral slices.
-
-The implementation agent executes slices in dependency order and must not redesign or reinterpret frozen behavior. This is the default mode for lower-cost implementation models.
+Use when the plan already defines low-discretion behavioral slices. The agent executes dependency order and must not redesign frozen behavior.
 
 ### Goal execution
 
-Use when the external behavior and constraints are frozen but the implementation search space remains bounded enough that prescribing every local step would add more overhead than value.
+Use when external behavior, experience, constraints, and tests are frozen but the local implementation search space remains bounded enough that prescribing every step adds more overhead than value.
 
-The goal agent may decide **how** to implement inside the frozen boundary, including local sequencing, internal function structure, and small architecture-consistent refactors required by the goal. It may not redefine **what** the system should do, acceptance criteria, public contracts, persistence semantics, security boundaries, or material architecture decisions.
+Goal mode gives freedom over **how**, not **what**. It may not redefine user-visible behavior, acceptance, public contracts, persistence/security semantics, material architecture, or approved experience.
 
-Goal mode is not permission to broaden scope.
+Goal mode must evaluate gate dependencies at every slice/checkpoint. It may chain engineering work only while prerequisite blocking-human gates are PASS.
 
-Record the chosen mode in `state.yaml`.
+`PENDING HUMAN REVIEW` is not permission to continue dependent work.
 
-## 9. Implementation gate
+Record mode in `state.yaml`.
 
-During `IMPLEMENTING`, follow the selected execution mode and the target repository's project rules.
+## 10. Implementation gate
 
-Use the project's explicit code and testing standards when present. If they are absent, use the fallback baseline defined by this configuration repository. Project-specific rules always win over the fallback baseline.
+During `IMPLEMENTING`, follow selected mode and target-repository rules.
 
-After each slice, or after each meaningful checkpoint in goal mode:
+After each slice/checkpoint:
 
-1. inspect the resulting diff;
+1. inspect diff;
 2. run targeted tests;
-3. run relevant integration or journey tests;
-4. verify the applicable acceptance criteria;
-5. verify invariants and non-goals;
-6. confirm no duplicate source of truth or unplanned architecture was introduced;
-7. confirm tests were not weakened to obtain green status;
-8. perform a self-review against the frozen contracts;
-9. record evidence and implementation deviations.
+3. run relevant integration/journey tests;
+4. verify acceptance criteria;
+5. verify invariants/non-goals;
+6. confirm no duplicate source of truth or unplanned architecture;
+7. confirm tests were not weakened;
+8. self-review against all frozen contracts;
+9. evaluate every manual gate owned/prerequisite at this point;
+10. record evidence and deviations.
 
-If execution requires a material product or architecture decision not covered by the frozen contracts, stop. Do not guess.
+If a required blocking-human gate is `PENDING` or `FAIL`, stop dependent work with:
 
-Advance to `IMPLEMENTATION_READY` only when the planned scope is complete and the full change-level verification appropriate to the risk is green or explicitly documented as unavailable.
+```text
+HARD STOP — BLOCKING HUMAN GATE
+Slice/checkpoint:
+Gate:
+Status: PENDING | FAIL
+Evidence ready for human review:
+Dependent work that must not begin:
+```
 
-## 10. Model routing
+If execution requires a material product/experience/architecture decision not covered by frozen contracts, stop with:
+
+```text
+HARD STOP — EXPERIENCE GATE REQUIRED
+Current slice/checkpoint:
+Missing decision/artifact:
+Why dependent implementation cannot safely continue:
+Safe independent engineering work, if any:
+```
+
+Advance to `IMPLEMENTATION_READY` only when planned scope is complete, verification is green or explicitly unavailable, and all required blocking-human gates are PASS.
+
+## 11. Model routing
 
 Model choice is a cost/complexity decision, not part of the product contract.
 
 Default routing:
 
-- requirement closure, plan creation, plan audit, test review, and independent review → high-reasoning model;
-- low-discretion slice execution → lower-cost implementation model when task complexity permits;
-- goal execution or slices with high semantic complexity → stronger implementation model.
+- requirement closure, experience-option synthesis/review support, plan creation, plan audit, test review, and independent review → high-reasoning model;
+- low-discretion engineering slice execution → lower-cost model when complexity permits;
+- goal execution/high semantic complexity → stronger implementation model.
 
-Escalate implementation when the task involves several interacting invariants, cross-module semantic changes, complex state/lifecycle behavior, migrations, persistence, concurrency, security-sensitive logic, or repeated failure by a lower-cost model.
+Coding agents can generate experience options, but human approval is required to freeze material visual/UX decisions unless the user explicitly delegates that authority.
 
-If the first independent review finds a severe semantic implementation defect despite a frozen and explicit contract, prefer escalating the implementation model rather than entering an indefinite low-cost patch/review loop.
+Escalate implementation when several interacting invariants, cross-module semantics, migrations, persistence, concurrency, security, or repeated lower-cost model failures are involved.
 
-## 11. Independent review
+## 12. Independent review
 
 Independent review starts from the trusted pre-change baseline and does not trust the implementation summary.
 
-Review against the frozen requirement, plan, test contract, project rules, and actual diff in this order:
+Review against frozen requirement, approved experience when applicable, plan, test contract, project rules, and actual diff in this order:
 
-1. correctness and requirement compliance;
-2. state/lifecycle/invariants;
-3. data integrity, idempotency, failure and recovery behavior;
-4. compatibility and security boundaries;
-5. false-green test risk;
-6. architecture consistency and unnecessary complexity;
-7. maintainability.
+1. correctness/requirement compliance;
+2. experience fidelity for user-visible work;
+3. state/lifecycle/invariants;
+4. data integrity/idempotency/failure/recovery;
+5. compatibility/security;
+6. false-green test risk;
+7. architecture consistency/unnecessary complexity;
+8. maintainability.
 
-Do not use modified requirement documents in the same untrusted change set as sole evidence that the implementation is correct.
+Do not use modified contracts in the same untrusted implementation change set as sole evidence that implementation is correct.
 
-Every blocking finding must include evidence, impact, and a bounded correction direction.
+Every blocking finding must include evidence, impact, and bounded correction direction.
 
-## 12. Finding taxonomy
+## 13. Finding taxonomy
 
-Severity and origin are separate dimensions.
+Severity and origin are separate:
 
-Use one origin for each material finding:
-
-- `IMPLEMENTATION_DEFECT` (`I`) — implementation violates an already frozen contract or project rule.
-- `PLAN_OR_SPEC_DEFECT` (`P`) — the frozen requirement, plan, or test contract is incomplete, contradictory, or wrong.
-- `REVIEW_MISS` (`R`) — during re-review, an issue is found that already existed in the previous reviewed change set and reasonably should have been detected then.
-- `DISCOVERY` (`D`) — new evidence became available only through implementation, execution, environment, or integration and could not reasonably have been closed earlier.
-
-Use severity independently, for example `Blocker`, `Required`, or `Follow-up` according to project review rules.
+- `IMPLEMENTATION_DEFECT` (`I`) — implementation violates a frozen contract/approved experience/project rule;
+- `PLAN_OR_SPEC_DEFECT` (`P`) — requirement, experience, plan, or test contract is incomplete/contradictory/wrong;
+- `REVIEW_MISS` (`R`) — re-review finds a pre-existing issue the prior review reasonably should have caught;
+- `DISCOVERY` (`D`) — new evidence available only through execution/environment/integration.
 
 This taxonomy is for workflow diagnosis, not blame.
 
-## 13. Fix routing
+## 14. Fix routing
 
-After a blocking review, classify findings before editing.
+- `IMPLEMENTATION_DEFECT` → stay within frozen delivery contract and fix implementation.
+- `PLAN_OR_SPEC_DEFECT` → return to earliest affected gate; implementation agent must not invent missing rule.
+- `DISCOVERY` → decide which contract is affected, update it, re-run downstream gates.
+- `REVIEW_MISS` → fix if valid and record separately.
 
-- `IMPLEMENTATION_DEFECT` → remain within the frozen delivery contract and fix the implementation.
-- `PLAN_OR_SPEC_DEFECT` → return to the earliest affected contract gate; do not let the implementation agent invent the missing rule.
-- `DISCOVERY` → decide which contract is affected, update it, and re-run the necessary downstream gates.
-- `REVIEW_MISS` → fix if valid, but record it separately so review convergence can be measured.
+For visual/UX failure, distinguish:
 
-Do not combine unrelated cleanup or redesign with a finding fix.
+- implementation failed to reproduce approved target → implementation defect;
+- approved target itself is unacceptable → reopen Experience Gate, not random code polishing.
 
-## 14. Re-review
+Do not combine unrelated cleanup/redesign with finding fixes.
 
-Re-review is not a new independent audit.
+## 15. Re-review
 
-Its primary scope is limited to:
+Re-review primarily checks previous finding closure, fixing diff correctness, direct regressions, and required evidence. It is not a new invitation to reopen unrelated design space.
 
-1. whether the previous blocking findings are actually closed;
-2. whether the fixing diff is correct;
-3. whether the fixing diff introduced direct regressions;
-4. whether required verification evidence is now present.
+Outcomes:
 
-Do not reopen already frozen and unrelated design space merely because a new review pass is being performed.
+- `PASS` → advance to `ACCEPTANCE` or `DONE`;
+- `PASS_WITH_NON_BLOCKING_FINDINGS` → same transition with findings recorded;
+- `BLOCK` → route by origin.
 
-If a valid pre-existing issue is discovered that reasonably should have been found in the previous review, it may still be reported, but classify it as `REVIEW_MISS`.
+## 16. Acceptance gate
 
-This distinction is required to prevent an endless sequence of statistically different full audits from being mistaken for repeated implementation failure.
+Acceptance answers whether shipped behavior is demonstrated in the environment that matters.
 
-Review outcomes:
-
-- `PASS` → advance to `ACCEPTANCE` when acceptance evidence remains, otherwise `DONE`.
-- `PASS_WITH_NON_BLOCKING_FINDINGS` → same transition, with findings recorded.
-- `BLOCK` → route findings according to their origin.
-
-## 15. Acceptance gate
-
-Acceptance answers whether the shipped behavior is demonstrated in the environment that matters.
-
-Prefer deterministic automated evidence. Add manual or computer-use checks only for residual behavior that automation cannot prove well.
+Prefer deterministic automated evidence, but do not postpone a required blocking-human product/experience gate to final acceptance when dependent implementation should have stopped earlier.
 
 Advance to `DONE` only when:
 
-- all acceptance criteria are satisfied or explicitly waived by the user;
+- all acceptance criteria are satisfied/explicitly waived;
 - required automated checks are green;
 - required manual/computer-use checks are complete;
+- all blocking-human gates are PASS;
 - blocking review findings are resolved;
-- residual risks and unverified areas are documented;
-- `state.yaml` points to the final verified commit or equivalent durable evidence when available.
+- residual risks/unverified areas are documented;
+- `state.yaml` points to final verified commit/evidence when available.
 
-## 16. Cross-chat handoff
-
-A new agent or chat should be able to resume by reading project rules and the task packet.
+## 17. Cross-chat handoff
 
 Before ending an active phase, persist:
 
-- current phase and freeze status;
-- selected implementation mode when applicable;
-- completed and pending slices or goal checkpoints;
+- current phase/freeze status;
+- task classification and experience status;
+- selected implementation mode;
+- completed/pending slices/checkpoints;
+- blocking/nonblocking human gates and evidence;
 - decisions that changed a contract;
-- verification commands and outcomes;
-- relevant commit SHA or diff baseline when known;
-- review findings and origin classification;
+- verification commands/outcomes;
+- relevant commit/diff baseline;
+- review findings/origin;
 - blockers;
-- exact next role and action.
+- exact next role/action.
 
-Do not store a long conversation transcript. Persist decisions and evidence, not discussion history.
+Persist decisions/evidence, not conversation transcripts.
 
-## 17. State reconciliation
+## 18. State reconciliation
 
-Repository state can move outside this workflow. Therefore `state.yaml` is not blindly authoritative about facts such as current commit or test status.
+Repository state can move outside this workflow. `state.yaml` is not blindly authoritative.
 
 On resume:
 
-1. compare the recorded branch/commit with the actual repository;
-2. inspect relevant diff and working tree state;
-3. re-run only the checks needed to establish a trustworthy baseline;
-4. update stale state before making further transitions.
+1. compare recorded branch/commit with actual repository;
+2. inspect relevant diff/working tree;
+3. verify required experience artifact still matches the implementation target;
+4. re-run only checks needed for trustworthy baseline;
+5. update stale state before further transitions.
 
-When a task packet conflicts with explicit new user instructions, follow the user and update the task packet so later agents do not inherit stale intent.
+Explicit new user instructions win; update the packet so later agents do not inherit stale intent.
 
-## 18. Workflow diagnostics
+## 19. Workflow diagnostics
 
-When evaluating whether the workflow or model routing is working, do not use review-round count alone.
+Do not use review-round count alone.
 
 Track at least:
 
 - first-pass implementation defects after `DELIVERY_FROZEN`;
 - `I / P / R / D` finding counts;
 - severe semantic implementation defects;
+- experience-gate failures discovered after implementation began;
+- blocking-human gates incorrectly bypassed;
 - fix-induced regressions;
-- number of re-reviews required for closure.
+- re-reviews required for closure.
 
-Repeated `I` findings indicate an implementation execution problem. Repeated `P` findings indicate premature freeze. Repeated `R` findings indicate review convergence problems. `D` findings indicate genuine implementation-time discovery rather than necessarily a process failure.
+Repeated `I` findings indicate execution problems. Repeated `P` findings indicate premature freeze. Repeated late experience failures indicate the Experience Gate is too weak or was bypassed. Repeated `R` findings indicate review convergence problems. `D` findings indicate genuine implementation-time discovery.
