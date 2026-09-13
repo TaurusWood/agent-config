@@ -7,19 +7,26 @@ protocol:
 phase: "DRAFT"
 branch: ""
 target_branch: "main"
+classification:
+  task_type: "" # engineering | experience-sensitive
+  experience_contract: "" # path or N/A
+  experience_status: "" # NOT_REQUIRED | DRAFT | REVIEW | FROZEN | BLOCKED
 freeze:
   plan: false
   delivery: false
 implementation_mode: ""
 contracts:
   requirement: "draft"
+  experience: "missing" # not_required | missing | draft | review | frozen | blocked
   implementation_plan: "missing"
   test_contract: "missing"
 reviews:
   requirement: "pending"
+  experience: "pending" # pending | pass | fail | n/a
   plan: "pending"
   test: "pending"
   implementation: "pending"
+manual_gates: [] # each: id, class(blocking-human|nonblocking-human), status(PENDING|PASS|FAIL), evidence
 slices: []
 current_owner:
   role: ""
